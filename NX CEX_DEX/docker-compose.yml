@@ -1,0 +1,70 @@
+version: '3.8'
+services:
+  # Core Services
+  api-gateway:
+    build: ./services/api-gateway
+    ports: ["80:80", "443:443"]
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis-cluster
+      - user-service
+      - trading-service
+
+  user-service:
+    build: ./services/user-service
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/users
+      - REDIS_URL=redis://redis-cluster:6379
+
+  trading-service:
+    build: ./services/trading-service
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/trading
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+
+  # Trading Engines
+  spot-engine:
+    build: ./engines/spot-engine
+    scale: 5
+    environment:
+      - REDIS_CLUSTER=redis://redis-cluster:6379
+
+  futures-engine:
+    build: ./engines/futures-engine
+    scale: 3
+
+  perpetual-engine:
+    build: ./engines/perpetual-engine
+    scale: 3
+
+  # Financial Services
+  staking-service:
+    build: ./services/staking-service
+
+  lending-service:
+    build: ./services/lending-service
+
+  launchpad-service:
+    build: ./services/launchpad-service
+
+  # Infrastructure
+  mongodb:
+    image: mongo:6.0
+    volumes:
+      - mongo_data:/data/db
+    command: ["--replSet", "rs0", "--keyFile", "/data/keyfile"]
+
+  redis-cluster:
+    image: redis:7.2-alpine
+    command: redis-server --cluster-enabled yes
+    scale: 6
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  mongo_data:
+  rabbitmq_data:
